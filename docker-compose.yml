@@ -1,0 +1,36 @@
+version: '3.8'
+
+services:
+  oracle-xe:
+    image: gvenzl/oracle-xe:21-slim-faststart
+    container_name: oracle-xe
+    ports:
+      - "1521:1521"
+      - "8081:8080"
+    environment:
+      ORACLE_PASSWORD: MyPassword123
+    healthcheck:
+      test: ["CMD-SHELL", "echo 'SELECT 1 FROM DUAL;' | sqlplus -s system/MyPassword123@localhost/XEPDB1 || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 10
+
+  superset:
+    build: ./superset
+    container_name: superset
+    ports:
+      - "8088:8088"
+    environment:
+      SUPERSET_CONFIG_PATH: /app/pythonpath/superset_config.py
+      LD_LIBRARY_PATH: /opt/oracle/instantclient_latest
+
+    volumes:
+      - ./superset:/app/pythonpath
+    depends_on:
+      - oracle-xe
+    command: >
+      bash -c "
+      superset db upgrade &&
+      superset fab create-admin --username admin --firstname Superset --lastname Admin --email admin@superset.com --password admin &&
+      superset init &&
+      superset run -h 0.0.0.0 -p 8088 --with-threads --reload --debugger"
